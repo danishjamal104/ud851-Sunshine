@@ -20,7 +20,9 @@ import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.widget.TextView;
 
+import com.example.android.sunshine.data.SunshinePreferences;
 import com.example.android.sunshine.utilities.NetworkUtils;
+import com.example.android.sunshine.utilities.OpenWeatherJsonUtils;
 
 import java.io.IOException;
 import java.net.URL;
@@ -58,29 +60,43 @@ public class MainActivity extends AppCompatActivity {
 
 
         // COMPLETED (9) Call loadWeatherData to perform the network request to get the weather
-        loadWeatherData("india");
+        loadWeatherData();
     }
 
     // COMPLETED (8) Create a method that will get the user's preferred location and execute your new AsyncTask and call it loadWeatherData
-    void loadWeatherData(String location){
+    void loadWeatherData(){
         FetchWeatherTask fetchWeatherTask = new FetchWeatherTask();
-        fetchWeatherTask.execute(NetworkUtils.buildUrl(location));
+        fetchWeatherTask.execute(SunshinePreferences.getPreferredWeatherLocation(MainActivity.this));
     }
 
     // COMPLETED (5) Create a class that extends AsyncTask to perform network requests
     // COMPLETED (6) Override the doInBackground method to perform your network requests
     // COMPLETED (7) Override the onPostExecute method to display the results of the network request
-    class FetchWeatherTask extends AsyncTask<URL, Void, String>{
+    class FetchWeatherTask extends AsyncTask<String, Void, String[]>{
 
         @Override
-        protected String doInBackground(URL... urls) {
-            String result=null;
-            try {
-                result = NetworkUtils.getResponseFromHttpUrl(urls[0]);
-            } catch (IOException e) {
-                e.printStackTrace();
+        protected String[] doInBackground(String... params) {
+            /* If there's no zip code, there's nothing to look up. */
+            if (params.length == 0) {
+                return null;
             }
-            return result;
+
+            String location = params[0];
+            URL weatherRequestUrl = NetworkUtils.buildUrl(location);
+
+            try {
+                String jsonWeatherResponse = NetworkUtils
+                        .getResponseFromHttpUrl(weatherRequestUrl);
+
+                String[] simpleJsonWeatherData = OpenWeatherJsonUtils
+                        .getSimpleWeatherStringsFromJson(MainActivity.this, jsonWeatherResponse);
+
+                return simpleJsonWeatherData;
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                return null;
+            }
         }
 
         @Override
@@ -89,9 +105,16 @@ public class MainActivity extends AppCompatActivity {
         }
 
         @Override
-        protected void onPostExecute(String s) {
-            if(s!=null && !s.equals("")){
-                mWeatherTextView.setText(s);
+        protected void onPostExecute(String[] weatherData) {
+            if (weatherData != null) {
+                /*
+                 * Iterate through the array and append the Strings to the TextView. The reason why we add
+                 * the "\n\n\n" after the String is to give visual separation between each String in the
+                 * TextView. Later, we'll learn about a better way to display lists of data.
+                 */
+                for (String weatherString : weatherData) {
+                    mWeatherTextView.append((weatherString) + "\n\n\n");
+                }
             }
         }
 
